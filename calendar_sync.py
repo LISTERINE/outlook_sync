@@ -8,6 +8,73 @@ import gdata.calendar.service, gdata.service, atom.service, gdata.calendar, atom
 import pdb
 
 
+"""
+
+this is what is called by GCal.insert_event
+see if we can swap this out useing the put method that this InsertEvent uses.
+should be something like cal_client.put(...)
+
+def InsertEvent(self, new_event, insert_uri, url_params=None, escape_params=True):
+    #Adds an event to Google Calendar.
+
+    #Args: 
+    #  new_event: atom.Entry or subclass A new event which is to be added to 
+    #            Google Calendar.
+    #  insert_uri: the URL to post new events to the feed
+    #  url_params: dict (optional) Additional URL parameters to be included
+    #              in the insertion request. 
+    #  escape_params: boolean (optional) If true, the url_parameters will be
+    #                 escaped before they are included in the request.
+
+    #Returns:
+    #  On successful insert,  an entry containing the event created
+    #  On failure, a RequestError is raised of the form:
+    #    {'status': HTTP status code from server, 
+    #     'reason': HTTP reason from the server, 
+    #     'body': HTTP body of the server's response}
+    #
+
+    return self.Post(new_event, insert_uri, url_params=url_params,
+                     escape_params=escape_params, 
+                     converter=gdata.calendar.CalendarEventEntryFromString)
+
+
+
+------------------------------------
+Methods inherited from atom.service.AtomService:
+PrepareConnection(self, full_uri)
+Opens a connection to the server based on the full URI.
+ 
+Examines the target URI and the proxy settings, which are set as 
+environment variables, to open a connection with the server. This 
+connection is used to make an HTTP request.
+ 
+Args:
+  full_uri: str Which is the target relative (lacks protocol and host) or
+  absolute URL to be opened. Example:
+  'https://www.google.com/accounts/ClientLogin' or
+  'base/feeds/snippets' where the server is set to www.google.com.
+ 
+Returns:
+  A tuple containing the httplib.HTTPConnection and the full_uri for the
+  request.
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+
+
+
+
 class Event(object):
 
     outlook_date_format = "%m/%d/%y %H:%M:%S"
