@@ -10,6 +10,11 @@ import pdb
 
 """
 
+look at:
+http://www.daniweb.com/software-development/python/threads/323721/specifying-proxy-using-urllib2
+
+
+------------------------------------------------------
 this is what is called by GCal.insert_event
 see if we can swap this out useing the put method that this InsertEvent uses.
 should be something like cal_client.put(...)
