@@ -2,82 +2,12 @@ import win32com.client
 from time import strptime, strftime, time, gmtime
 from datetime import date, timedelta, datetime
 from getpass import getpass
-
-import gdata.calendar.service, gdata.service, atom.service, gdata.calendar, atom, atom.data
+from os import environ
+from ConfigParser import SafeConfigParser
+import gdata.calendar.service, gdata.service, gdata.calendar, gdata.calendar.client
+import atom.service, atom, atom.data
 
 import pdb
-
-
-"""
-
-look at:
-http://www.daniweb.com/software-development/python/threads/323721/specifying-proxy-using-urllib2
-
-
-------------------------------------------------------
-this is what is called by GCal.insert_event
-see if we can swap this out useing the put method that this InsertEvent uses.
-should be something like cal_client.put(...)
-
-def InsertEvent(self, new_event, insert_uri, url_params=None, escape_params=True):
-    #Adds an event to Google Calendar.
-
-    #Args: 
-    #  new_event: atom.Entry or subclass A new event which is to be added to 
-    #            Google Calendar.
-    #  insert_uri: the URL to post new events to the feed
-    #  url_params: dict (optional) Additional URL parameters to be included
-    #              in the insertion request. 
-    #  escape_params: boolean (optional) If true, the url_parameters will be
-    #                 escaped before they are included in the request.
-
-    #Returns:
-    #  On successful insert,  an entry containing the event created
-    #  On failure, a RequestError is raised of the form:
-    #    {'status': HTTP status code from server, 
-    #     'reason': HTTP reason from the server, 
-    #     'body': HTTP body of the server's response}
-    #
-
-    return self.Post(new_event, insert_uri, url_params=url_params,
-                     escape_params=escape_params, 
-                     converter=gdata.calendar.CalendarEventEntryFromString)
-
-
-
-------------------------------------
-Methods inherited from atom.service.AtomService:
-PrepareConnection(self, full_uri)
-Opens a connection to the server based on the full URI.
- 
-Examines the target URI and the proxy settings, which are set as 
-environment variables, to open a connection with the server. This 
-connection is used to make an HTTP request.
- 
-Args:
-  full_uri: str Which is the target relative (lacks protocol and host) or
-  absolute URL to be opened. Example:
-  'https://www.google.com/accounts/ClientLogin' or
-  'base/feeds/snippets' where the server is set to www.google.com.
- 
-Returns:
-  A tuple containing the httplib.HTTPConnection and the full_uri for the
-  request.
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-
-
 
 
 class Event(object):
@@ -100,7 +30,6 @@ class Event(object):
     def from_gcal_fmt(self):
         self.start = "-".join(self.start.split("-")[0:-1])
         self.end = "-".join(self.end.split("-")[0:-1])
-        print self.start
         self.start = strptime(self.start, self.google_cal_format)
         self.end = strptime(self.end, self.google_cal_format)
 
@@ -124,30 +53,28 @@ class Event(object):
 class GCal(object):
 
     def log_in(self, username, password):
-        self.cal_client = gdata.calendar.service.CalendarService()
-        self.cal_client.email = username
-        self.cal_client.password = password
-        self.cal_client.source = 'Google-Calendar-sync'
-        self.cal_client.ProgrammaticLogin()
+        self.cal_client = gdata.calendar.client.CalendarClient(source='Google-Calendar-sync')
+        self.cal_client.ClientLogin(username, password, self.cal_client.source)
         return self.cal_client
 
     def insert_event(self, start_time=None, end_time=None):
-        event = gdata.calendar.CalendarEventEntry()
-        event.title = atom.Title(text="Busy!")
-        event.content = atom.Content(text="")
+        event = gdata.calendar.data.CalendarEventEntry()
+        event.title = atom.data.Title(text="Busy!")
+        event.content = atom.data.Content(text="")
 
         if start_time is None:
             print "No start time, can not sync event"
-        when = gdata.calendar.When(start_time=start_time, end_time=end_time)
-        event.when.append(when)
-        # Add an alert
-        reminder = gdata.calendar.Reminder(minutes='60')
-        reminder._attributes['method'] = 'method'
-        reminder.method = 'alert'
-        event.when[0].reminder.append(reminder)
+        event.when.append(gdata.data.When(start=start_time, end=end_time))
 
         # Enter event into google calendar
-        new_event = self.cal_client.InsertEvent(event, '/calendar/feeds/default/private/full')
+        new_event = self.cal_client.InsertEvent(event)
+
+        # Add an alert
+        g_reminder = gdata.data.Reminder(minutes='60')
+        g_reminder.method = 'alert'
+        new_event.when[0].reminder.append(g_reminder)
+        self.cal_client.Update(new_event)
+
 
         print 'New single event inserted: %s' % (new_event.id.text,)
         #print '\tEvent edit URL: %s' % (new_event.GetEditLink().href,)
@@ -160,6 +87,7 @@ def evt_exist(evt, evt_list):
     return False
 
 def approve_appointment(appointment):
+    print "-------------------------------------------------------------"
     print "appointment info:",appointment.text
     print "start time:",appointment.start
     print "end time:", appointment.end
@@ -173,24 +101,21 @@ def approve_appointment(appointment):
 
 CALENDAR = 9
 
-def get_dates_in_range(cal_client, start_date='2013-08-19', end_date='2013-09-02'):
+def get_dates_in_range(cal_client, start_date, end_date):
     # date format is yyyy-mm-dd
 
     gevent_list = []
 
     print 'Date range query for events on Primary Calendar: %s to %s' % (
         start_date, end_date,)
-    query = gdata.calendar.service.CalendarEventQuery('default', 'private', 'full')
-    query.start_min=start_date
-    query.start_max=end_date
-    query.params="orderby=starttime"
-    feed = cal_client.CalendarQuery(query)
+    query = gdata.calendar.client.CalendarEventQuery(start_min=start_date, start_max=end_date)
+    feed = cal_client.GetCalendarEventFeed(q=query)
     for event in feed.entry:
         title = event.title.text
         e = Event(text=title)
         for e_when in event.when:
-            e.start = e_when.start_time
-            e.end = e_when.end_time
+            e.start = e_when.start
+            e.end = e_when.end
         e.gcal_to_google()
         gevent_list.append(e)
     sorted_gevents = sorted(gevent_list, key=lambda x:x.__str__())
@@ -199,11 +124,19 @@ def get_dates_in_range(cal_client, start_date='2013-08-19', end_date='2013-09-02
 
 if __name__ == "__main__":
 
-    event_list = []
+
+    config = SafeConfigParser()
+    config.read("config")
+    username = config.get("user", "username")
+    http_proxy = config.get("proxy", "http_proxy")
+    https_proxy = config.get("proxy", "https_proxy")
+    environ['http_proxy']=http_proxy
+    environ['https_proxy']=https_proxy
+
+    outlook_event_list = []
 
     gcal = GCal()
-    username = raw_input("Enter google username: ")
-    password = getpass("Enter Password: ")
+    password = getpass("Enter Google password: ")
     gclient = gcal.log_in(username, password)
 
     outlook = win32com.client.Dispatch("Outlook.Application")
@@ -229,14 +162,16 @@ if __name__ == "__main__":
         end = appointment.end.Format()
         event = Event(start, end)
         event.outlook_to_google()
-        event_list.append(event)
+        outlook_event_list.append(event)
 
-    for evt in event_list:
+    for evt in outlook_event_list:
         if not evt_exist(evt, google_events):
             if approve_appointment(evt):
                 gcal.insert_event(evt.start, evt.end)
             else:
                 print "Not syncing"
+
+    print "All events synchronized"
 
 
 

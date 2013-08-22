@@ -1,0 +1,5 @@
+[user]
+username=<user@gmail.com>
+[proxy]
+http_proxy=<proxy:port>
+https_proxy=<proxy:port>
