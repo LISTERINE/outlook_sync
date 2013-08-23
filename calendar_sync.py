@@ -3,6 +3,7 @@ from time import strptime, strftime, time, gmtime
 from datetime import date, timedelta, datetime
 from getpass import getpass
 from os import environ
+from sys import exit
 from ConfigParser import SafeConfigParser
 import gdata.calendar.service, gdata.service, gdata.calendar, gdata.calendar.client
 import atom.service, atom, atom.data
@@ -126,12 +127,23 @@ if __name__ == "__main__":
 
 
     config = SafeConfigParser()
-    config.read("config")
-    username = config.get("user", "username")
-    http_proxy = config.get("proxy", "http_proxy")
-    https_proxy = config.get("proxy", "https_proxy")
-    environ['http_proxy']=http_proxy
-    environ['https_proxy']=https_proxy
+    try:
+        config.read("config")
+        username = config.get("user", "username")
+        http_proxy = config.get("proxy", "http_proxy")
+        https_proxy = config.get("proxy", "https_proxy")
+        if http_proxy != "<proxy:port>":
+            environ['http_proxy']=http_proxy
+        if https_proxy != "<proxy:port>":
+            environ['https_proxy']=https_proxy
+    except Exception as e:
+        print "------------------------------\n"
+        print "Error while parsing config. Are you sure the config file is present in the directory?\n"
+        print "------------------------------"
+        print "Exception:"
+        print e
+        exit()
+
 
     outlook_event_list = []
 
@@ -172,7 +184,7 @@ if __name__ == "__main__":
                 print "Not syncing"
 
     print "All events synchronized"
-
+    raw_input("Press enter to quit...")
 
 
 
